@@ -232,38 +232,7 @@ struct MainSettingsView: View {
                     .frame(maxHeight: 130)
                 }
             }
-            VStack(alignment: .leading, spacing: 4) {
-                Text("提醒模式")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(.secondary)
-                
-                HStack(spacing: 5) {
-                    ForEach([
-                        (0, "普通飞过 ✈️"),
-                        (1, "中间悬停 ⏸")
-                    ], id: \.0) { item in
-                        let val = item.0
-                        let label = item.1
-                        let isSelected = manager.alarmMode == val
-                        
-                        Button(action: {
-                            manager.alarmMode = val
-                            manager.saveSettings()
-                        }) {
-                            Text(label)
-                                .font(.system(size: 11, weight: isSelected ? .bold : .regular))
-                                .foregroundColor(isSelected ? .white : .primary)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .fill(isSelected ? Color.blue : Color.gray.opacity(0.15))
-                                )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
+
             
             VStack(alignment: .leading, spacing: 4) {
                 Toggle(isOn: Binding(

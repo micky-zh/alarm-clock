@@ -29,8 +29,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         // Handle alarm trigger
-        alarmManager.onAlarmTrigger = { [weak self] reminderText, isImportant, mode in
-            self?.showFlightAnimation(text: reminderText, isImportant: isImportant, mode: mode)
+        alarmManager.onAlarmTrigger = { [weak self] reminderText, isImportant in
+            self?.showFlightAnimation(text: reminderText, isImportant: isImportant)
         }
         
         // Handle active alarm dismissal from status bar menu
@@ -55,7 +55,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
-    func showFlightAnimation(text: String, isImportant: Bool, mode: Int) {
+    func showFlightAnimation(text: String, isImportant: Bool) {
         // Close any existing flight window to avoid overlaps
         if let existingWindow = flightWindow {
             existingWindow.close()
@@ -63,7 +63,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         // Create new transparent window
-        let window = FlightWindow(reminderText: text, isImportant: isImportant, style: alarmManager.selectedStyle, mode: mode, onFinished: { [weak self] in
+        let window = FlightWindow(reminderText: text, isImportant: isImportant, style: alarmManager.selectedStyle, onFinished: { [weak self] in
             self?.flightWindow = nil
             self?.alarmManager.isAlarmFiring = false // Reset firing state
         })

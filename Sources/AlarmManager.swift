@@ -26,7 +26,6 @@ class AlarmManager: ObservableObject {
     @Published var launchAtLogin: Bool = false
     @Published var isImportantQuick: Bool = false
     @Published var selectedStyle: Int = 0
-    @Published var alarmMode: Int = 0 // 0 = fly through, 1 = hover, 2 = loop
     @Published var isAlarmFiring: Bool = false
     @Published var isCalendarSyncEnabled: Bool = false
     @Published var upcomingCalendarEvents: [EKEvent] = []
@@ -36,7 +35,7 @@ class AlarmManager: ObservableObject {
     private var todayCalendarEvents: [EKEvent] = []
     private var lastTriggeredCalendarEventId: String?
     
-    var onAlarmTrigger: ((String, Bool, Int) -> Void)?
+    var onAlarmTrigger: ((String, Bool) -> Void)?
     var onDismissActiveAlarm: (() -> Void)?
     
     init() {
@@ -63,7 +62,7 @@ class AlarmManager: ObservableObject {
             } else {
                 timeRemaining = 0
                 isTimerActive = false
-                triggerAlarm(text: reminderText.isEmpty ? "提醒时间到！" : reminderText, isImportant: isImportantQuick, mode: alarmMode)
+                triggerAlarm(text: reminderText.isEmpty ? "提醒时间到！" : reminderText, isImportant: isImportantQuick)
             }
         }
         
@@ -88,10 +87,10 @@ class AlarmManager: ObservableObject {
         timeRemaining = 0
     }
     
-    func triggerAlarm(text: String, isImportant: Bool, mode: Int) {
+    func triggerAlarm(text: String, isImportant: Bool) {
         isAlarmFiring = true
         DispatchQueue.main.async {
-            self.onAlarmTrigger?(text, isImportant, mode)
+            self.onAlarmTrigger?(text, isImportant)
         }
     }
     
@@ -102,7 +101,7 @@ class AlarmManager: ObservableObject {
     
     func triggerPreview() {
         let text = reminderText.isEmpty ? "这是一条测试预览提醒飞机拉幅横幅！" : reminderText
-        triggerAlarm(text: text, isImportant: isImportantQuick, mode: alarmMode)
+        triggerAlarm(text: text, isImportant: isImportantQuick)
     }
     
     var timeRemainingFormatted: String {
@@ -160,7 +159,7 @@ class AlarmManager: ObservableObject {
                alarm.minute == currentMinute &&
                alarm.weekdays.contains(currentWeekday) {
                 lastTriggeredTime = now
-                triggerAlarm(text: alarm.title.isEmpty ? "提醒时间到！" : alarm.title, isImportant: alarm.isImportant, mode: alarmMode)
+                triggerAlarm(text: alarm.title.isEmpty ? "提醒时间到！" : alarm.title, isImportant: alarm.isImportant)
                 break // Trigger only one alarm at a time
             }
         }
@@ -171,7 +170,6 @@ class AlarmManager: ObservableObject {
     private let alarmsKey = "com.airplane.alarms"
     private let launchKey = "com.airplane.launchAtLogin"
     private let styleKey = "com.airplane.selectedStyle"
-    private let modeKey = "com.airplane.alarmMode"
     private let calendarSyncKey = "com.airplane.calendarSyncEnabled"
     
     func toggleLaunchAtLogin() {
@@ -207,7 +205,6 @@ class AlarmManager: ObservableObject {
         }
         UserDefaults.standard.set(launchAtLogin, forKey: launchKey)
         UserDefaults.standard.set(selectedStyle, forKey: styleKey)
-        UserDefaults.standard.set(alarmMode, forKey: modeKey)
         UserDefaults.standard.set(isCalendarSyncEnabled, forKey: calendarSyncKey)
     }
     
@@ -218,8 +215,6 @@ class AlarmManager: ObservableObject {
         }
         self.launchAtLogin = UserDefaults.standard.bool(forKey: launchKey)
         self.selectedStyle = 0
-        let loadedMode = UserDefaults.standard.integer(forKey: modeKey)
-        self.alarmMode = (loadedMode == 0 || loadedMode == 1) ? loadedMode : 0
         self.isCalendarSyncEnabled = UserDefaults.standard.bool(forKey: calendarSyncKey)
     }
     
@@ -304,7 +299,7 @@ class AlarmManager: ObservableObject {
                 let eventId = event.eventIdentifier ?? ""
                 if lastTriggeredCalendarEventId != eventId {
                     lastTriggeredCalendarEventId = eventId
-                    triggerAlarm(text: "日程开始: \(event.title ?? "未命名日程")", isImportant: false, mode: alarmMode)
+                    triggerAlarm(text: "日程开始: \(event.title ?? "未命名日程")", isImportant: false)
                     break
                 }
             }

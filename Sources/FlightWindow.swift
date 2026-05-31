@@ -1,49 +1,6 @@
 import Cocoa
 import WebKit
 
-class FlightTracker {
-    var startTime = Date()
-    var isDismissing = false
-    var dismissStartTime = Date()
-    var dismissStartX: CGFloat = 0.0
-    
-    var duration: TimeInterval = 16.0
-    var dismissDuration: TimeInterval = 1.5
-    
-    var startX: CGFloat = 0
-    var endX: CGFloat = 0
-    var groupWidth: CGFloat = 850
-    var mode: Int = 0
-    
-    func getCurrentX(screenWidth: CGFloat) -> CGFloat {
-        let now = Date()
-        self.startX = -groupWidth
-        self.endX = screenWidth
-        
-        if isDismissing {
-            let elapsed = now.timeIntervalSince(dismissStartTime)
-            let p = min(elapsed / dismissDuration, 1.0)
-            let easeInP = p * p
-            return dismissStartX + (endX - dismissStartX) * CGFloat(easeInP)
-        } else {
-            let elapsed = now.timeIntervalSince(startTime)
-            let progress = min(elapsed / duration, 1.0)
-            
-            if mode == 0 {
-                return startX + (endX - startX) * CGFloat(progress)
-            } else {
-                let targetProgress: Double = 0.5
-                if progress < targetProgress {
-                    let entranceProgress = progress / targetProgress
-                    return startX + (endX / 2 - startX) * CGFloat(entranceProgress)
-                } else {
-                    return endX / 2
-                }
-            }
-        }
-    }
-}
-
 class FlightScriptMessageHandler: NSObject, WKScriptMessageHandler {
     weak var window: FlightWindow?
     var onFinished: () -> Void
@@ -57,11 +14,7 @@ class FlightScriptMessageHandler: NSObject, WKScriptMessageHandler {
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         guard let body = message.body as? String else { return }
         
-        if body == "startDismiss" {
-            DispatchQueue.main.async { [weak self] in
-                self?.window?.startDismissTracker()
-            }
-        } else if body == "finished" {
+        if body == "finished" {
             DispatchQueue.main.async { [weak self] in
                 self?.window?.close()
                 self?.onFinished()
@@ -71,10 +24,7 @@ class FlightScriptMessageHandler: NSObject, WKScriptMessageHandler {
 }
 
 class FlightWebView: WKWebView {
-    let tracker: FlightTracker
-    
-    init(frame: CGRect, configuration: WKWebViewConfiguration, tracker: FlightTracker) {
-        self.tracker = tracker
+    override init(frame: CGRect, configuration: WKWebViewConfiguration) {
         super.init(frame: frame, configuration: configuration)
         self.setValue(false, forKey: "drawsBackground") // Transparent background
     }
@@ -84,32 +34,16 @@ class FlightWebView: WKWebView {
     }
     
     override func hitTest(_ point: NSPoint) -> NSView? {
-        let screenHeight = self.bounds.height
-        let currentX = tracker.getCurrentX(screenWidth: self.bounds.width)
-        
-        let groupWidth: CGFloat = 850
-        let groupHeight: CGFloat = 360
-        let boxY = (screenHeight - groupHeight) / 2
-        
-        let appKitFrame = NSRect(
-            x: currentX,
-            y: boxY,
-            width: groupWidth,
-            height: groupHeight
-        )
-        
-        if appKitFrame.contains(point) {
-            return super.hitTest(point)
-        }
+        // AppKit level click-through is enabled via ignoresMouseEvents.
+        // We always return nil here to prevent any clicks inside the window from blocking other apps.
         return nil
     }
 }
 
 class FlightWindow: NSPanel {
     private var webView: FlightWebView?
-    private let tracker = FlightTracker()
     
-    init(reminderText: String, isImportant: Bool, style: Int, mode: Int, onFinished: @escaping () -> Void) {
+    init(reminderText: String, isImportant: Bool, style: Int, onFinished: @escaping () -> Void) {
         let screenRect = NSScreen.main?.frame ?? NSRect(x: 0, y: 0, width: 1920, height: 1080)
         
         super.init(
@@ -122,11 +56,9 @@ class FlightWindow: NSPanel {
         self.isOpaque = false
         self.backgroundColor = .clear
         self.level = .statusBar
-        self.ignoresMouseEvents = (mode == 0)
+        self.ignoresMouseEvents = true // Only fly-through, clicks will pass through
         self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         self.hasShadow = false
-        
-        tracker.mode = mode
         
         // Setup message handler
         let contentController = WKUserContentController()
@@ -136,7 +68,7 @@ class FlightWindow: NSPanel {
         let config = WKWebViewConfiguration()
         config.userContentController = contentController
         
-        let webView = FlightWebView(frame: NSRect(origin: .zero, size: screenRect.size), configuration: config, tracker: tracker)
+        let webView = FlightWebView(frame: NSRect(origin: .zero, size: screenRect.size), configuration: config)
         self.webView = webView
         self.contentView = webView
         
@@ -152,7 +84,6 @@ class FlightWindow: NSPanel {
         let processedHtml = htmlTemplate
             .replacingOccurrences(of: "##TEXT##", with: escapedText)
             .replacingOccurrences(of: "##IMPORTANT##", with: isImportant ? "true" : "false")
-            .replacingOccurrences(of: "##MODE##", with: "\(mode)")
             .replacingOccurrences(of: "##PLANE_BASE64##", with: planeBase64)
         
         webView.loadHTMLString(processedHtml, baseURL: nil)
@@ -167,13 +98,8 @@ class FlightWindow: NSPanel {
     }
     
     func dismiss() {
-        webView?.evaluateJavaScript("dismissFlight()", completionHandler: nil)
-    }
-    
-    func startDismissTracker() {
-        tracker.dismissStartX = tracker.getCurrentX(screenWidth: self.frame.width)
-        tracker.isDismissing = true
-        tracker.dismissStartTime = Date()
+        // Instant close on dismiss from status bar
+        self.close()
     }
     
     private func getHTMLTemplate() -> String {
@@ -210,8 +136,7 @@ class FlightWindow: NSPanel {
             left: 0;
             transform: translate3d(-900px, 0, 0);
             will-change: transform;
-            pointer-events: auto;
-            cursor: pointer;
+            pointer-events: none;
             z-index: 10;
           }
           
@@ -239,16 +164,6 @@ class FlightWindow: NSPanel {
           
           .bell-icon {
             font-size: 26px;
-            animation: ring 2.0s ease-in-out infinite;
-          }
-          
-          @keyframes ring {
-            0%, 100% { transform: rotate(0); }
-            10% { transform: rotate(18deg); }
-            20% { transform: rotate(-12deg); }
-            30% { transform: rotate(10deg); }
-            40% { transform: rotate(-8deg); }
-            50% { transform: rotate(0); }
           }
           
           .banner-text {
@@ -301,18 +216,12 @@ class FlightWindow: NSPanel {
           
           .propeller {
             transform-origin: 11px 50px;
-            animation: spinPropeller 0.12s linear infinite;
-          }
-          
-          @keyframes spinPropeller {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
           }
         </style>
         </head>
         <body>
           <div id="container">
-            <div id="flight-group" onclick="dismissFlight()">
+            <div id="flight-group">
               <!-- Banner -->
               <div class="banner-container">
                 <div class="banner-content">
@@ -348,7 +257,6 @@ class FlightWindow: NSPanel {
           <script>
             var reminderText = "##TEXT##";
             var isImportant = ##IMPORTANT##;
-            var mode = ##MODE##;
             
             document.getElementById("text-node").innerText = reminderText;
             
@@ -388,57 +296,31 @@ class FlightWindow: NSPanel {
             
             var startTime = Date.now();
             var duration = 16000;
-            var isDismissing = false;
-            var dismissStartTime = 0;
+            var loopCount = 0;
+            var maxLoops = 3;
             
             function animate() {
               var now = Date.now();
+              var elapsed = now - startTime;
+              var progress = Math.min(elapsed / duration, 1.0);
               
-              if (isDismissing) {
-                var elapsed = now - dismissStartTime;
-                var p = Math.min(elapsed / 1500, 1.0);
-                var easeInP = p * p; 
-                currentX = dismissStartX + (endX - dismissStartX) * easeInP;
-                
-                if (p >= 1.0) {
+              currentX = startX + (endX - startX) * progress;
+              
+              if (progress >= 1.0) {
+                loopCount += 1;
+                if (loopCount >= maxLoops) {
                   window.webkit.messageHandlers.dismiss.postMessage("finished");
                   return;
-                }
-              } else {
-                var elapsed = now - startTime;
-                var progress = Math.min(elapsed / duration, 1.0);
-                
-                if (mode === 0) {
-                  currentX = startX + (endX - startX) * progress;
-                  if (progress >= 1.0) {
-                    window.webkit.messageHandlers.dismiss.postMessage("finished");
-                    return;
-                  }
-                } else if (mode === 1) {
-                  var targetProgress = 0.5;
-                  if (progress < targetProgress) {
-                    var entranceProgress = progress / targetProgress;
-                    currentX = startX + (endX / 2 - startX) * entranceProgress;
-                  } else {
-                    currentX = endX / 2;
-                  }
+                } else {
+                  // Reset for the next loop
+                  startTime = Date.now();
+                  progress = 0;
+                  currentX = startX;
                 }
               }
               
               flightGroup.style.transform = "translate3d(" + Math.round(currentX) + "px, 0, 0)";
               requestAnimationFrame(animate);
-            }
-            
-            var dismissStartX = 0;
-            
-            function dismissFlight() {
-              if (isDismissing) return;
-              
-              dismissStartX = currentX;
-              isDismissing = true;
-              dismissStartTime = Date.now();
-              
-              window.webkit.messageHandlers.dismiss.postMessage("startDismiss");
             }
             
             requestAnimationFrame(animate);
