@@ -40,7 +40,7 @@ struct MainSettingsView: View {
         VStack(spacing: 12) {
             // Header
             HStack {
-                Image(systemName: "airplane")
+                Image(systemName: "paperplane")
                     .foregroundColor(.blue)
                     .font(.system(size: 18, weight: .bold))
                 Text("飞机飞行闹钟")

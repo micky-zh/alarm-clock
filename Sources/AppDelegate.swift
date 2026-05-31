@@ -18,8 +18,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Setup system status bar item
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem?.button {
-            // Use the native airplane SF Symbol
-            if let image = NSImage(systemSymbolName: "airplane.circle.fill", accessibilityDescription: "飞机闹钟") {
+            // Use the native paperplane SF Symbol (clean outline)
+            if let image = NSImage(systemSymbolName: "paperplane", accessibilityDescription: "飞机闹钟") {
                 // Ensure it scales nicely to status bar height
                 let config = NSImage.SymbolConfiguration(textStyle: .body, scale: .medium)
                 button.image = image.withSymbolConfiguration(config)
