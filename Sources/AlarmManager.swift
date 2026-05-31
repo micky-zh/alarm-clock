@@ -29,6 +29,7 @@ class AlarmManager: ObservableObject {
     @Published var alarmMode: Int = 0 // 0 = fly through, 1 = hover, 2 = loop
     @Published var isAlarmFiring: Bool = false
     @Published var isCalendarSyncEnabled: Bool = false
+    @Published var upcomingCalendarEvents: [EKEvent] = []
     
     private var timer: AnyCancellable?
     private var lastTriggeredTime: Date?
@@ -195,6 +196,7 @@ class AlarmManager: ObservableObject {
         } else {
             self.isCalendarSyncEnabled = false
             self.todayCalendarEvents = []
+            self.upcomingCalendarEvents = []
             saveSettings()
         }
     }
@@ -264,13 +266,17 @@ class AlarmManager: ObservableObject {
     
     func refreshCalendarEvents() {
         guard isCalendarSyncEnabled else {
-            todayCalendarEvents = []
+            DispatchQueue.main.async { [weak self] in
+                self?.todayCalendarEvents = []
+                self?.upcomingCalendarEvents = []
+            }
             return
         }
         DispatchQueue.global(qos: .userInitiated).async {
             let events = CalendarManager.shared.fetchTodayEvents()
             DispatchQueue.main.async { [weak self] in
                 self?.todayCalendarEvents = events
+                self?.upcomingCalendarEvents = events
             }
         }
     }

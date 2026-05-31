@@ -278,6 +278,35 @@ struct MainSettingsView: View {
                     }
                 }
                 .toggleStyle(.checkbox)
+                
+                if manager.isCalendarSyncEnabled {
+                    if manager.upcomingCalendarEvents.isEmpty {
+                        Text("今天后续暂无待提醒的日程")
+                            .font(.system(size: 9))
+                            .foregroundColor(.secondary)
+                            .padding(.leading, 18)
+                            .padding(.top, 1)
+                    } else {
+                        VStack(alignment: .leading, spacing: 3) {
+                            ForEach(manager.upcomingCalendarEvents.prefix(3), id: \.eventIdentifier) { event in
+                                HStack(spacing: 4) {
+                                    Image(systemName: "circle.fill")
+                                        .font(.system(size: 3))
+                                        .foregroundColor(.blue)
+                                    Text("\(formatEventTime(event.startDate))")
+                                        .font(.system(size: 9, design: .monospaced))
+                                        .foregroundColor(.blue.opacity(0.8))
+                                    Text(event.title ?? "未命名日程")
+                                        .font(.system(size: 9))
+                                        .foregroundColor(.secondary)
+                                        .lineLimit(1)
+                                }
+                                .padding(.leading, 18)
+                            }
+                        }
+                        .padding(.top, 1)
+                    }
+                }
             }
             .padding(.top, 2)
             
@@ -332,6 +361,13 @@ struct MainSettingsView: View {
             return r1 < r2
         }
         return "每周" + sorted.compactMap { dayMap[$0] }.joined(separator: "、")
+    }
+    
+    private func formatEventTime(_ date: Date?) -> String {
+        guard let date = date else { return "" }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: date)
     }
 }
 
