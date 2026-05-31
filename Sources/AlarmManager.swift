@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import EventKit
 
 // MARK: - Alarm Model
 struct Alarm: Codable, Identifiable, Equatable {
@@ -31,6 +32,8 @@ class AlarmManager: ObservableObject {
     
     private var timer: AnyCancellable?
     private var lastTriggeredTime: Date?
+    private var todayCalendarEvents: [EKEvent] = []
+    private var lastTriggeredCalendarEventId: String?
     
     var onAlarmTrigger: ((String, Bool, Int) -> Void)?
     var onDismissActiveAlarm: (() -> Void)?
@@ -38,6 +41,8 @@ class AlarmManager: ObservableObject {
     init() {
         loadSettings()
         startGlobalTimer()
+        NotificationCenter.default.addObserver(self, selector: #selector(calendarChanged), name: .EKEventStoreChanged, object: nil)
+        refreshCalendarEvents()
     }
     
     func startGlobalTimer() {
@@ -63,6 +68,9 @@ class AlarmManager: ObservableObject {
         
         // 2. Check recurring alarms
         checkRecurringAlarms()
+        
+        // 3. Check calendar events
+        checkCalendarEvents()
     }
     
     // Countdown Timer Controls
@@ -177,6 +185,7 @@ class AlarmManager: ObservableObject {
                 DispatchQueue.main.async {
                     if granted {
                         self?.isCalendarSyncEnabled = true
+                        self?.refreshCalendarEvents()
                     } else {
                         self?.isCalendarSyncEnabled = false
                     }
@@ -185,6 +194,7 @@ class AlarmManager: ObservableObject {
             }
         } else {
             self.isCalendarSyncEnabled = false
+            self.todayCalendarEvents = []
             saveSettings()
         }
     }
@@ -243,6 +253,55 @@ class AlarmManager: ObservableObject {
             try? plistContent.write(to: path, atomically: true, encoding: .utf8)
         } else {
             try? FileManager.default.removeItem(at: path)
+        }
+    }
+    
+    // MARK: - Calendar Sync Handlers
+    
+    @objc private func calendarChanged() {
+        refreshCalendarEvents()
+    }
+    
+    func refreshCalendarEvents() {
+        guard isCalendarSyncEnabled else {
+            todayCalendarEvents = []
+            return
+        }
+        DispatchQueue.global(qos: .userInitiated).async {
+            let events = CalendarManager.shared.fetchTodayEvents()
+            DispatchQueue.main.async { [weak self] in
+                self?.todayCalendarEvents = events
+            }
+        }
+    }
+    
+    private func checkCalendarEvents() {
+        guard isCalendarSyncEnabled else { return }
+        let now = Date()
+        let calendar = Calendar.current
+        
+        for event in todayCalendarEvents {
+            guard let eventStartDate = event.startDate else { continue }
+            
+            // If the event starts too far in the past (e.g. more than 60 seconds ago), skip
+            guard eventStartDate > now.addingTimeInterval(-60) else { continue }
+            
+            let components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: now)
+            let eventComponents = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: eventStartDate)
+            
+            if components.year == eventComponents.year &&
+               components.month == eventComponents.month &&
+               components.day == eventComponents.day &&
+               components.hour == eventComponents.hour &&
+               components.minute == eventComponents.minute {
+                
+                let eventId = event.eventIdentifier ?? ""
+                if lastTriggeredCalendarEventId != eventId {
+                    lastTriggeredCalendarEventId = eventId
+                    triggerAlarm(text: "日程开始: \(event.title ?? "未命名日程")", isImportant: false, mode: alarmMode)
+                    break
+                }
+            }
         }
     }
 }

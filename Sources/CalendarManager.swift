@@ -36,4 +36,22 @@ class CalendarManager: ObservableObject {
             }
         }
     }
+    
+    func fetchTodayEvents() -> [EKEvent] {
+        checkAuthorization()
+        guard isAuthorized else { return [] }
+        
+        let calendar = Calendar.current
+        let now = Date()
+        
+        let start = calendar.startOfDay(for: now)
+        let end = calendar.date(byAdding: .day, value: 1, to: start)!
+        
+        let predicate = eventStore.predicateForEvents(withStart: start, end: end, calendars: nil)
+        let events = eventStore.events(matching: predicate)
+        
+        // Filter out all-day events and events that started in the past
+        return events.filter { !$0.isAllDay && $0.startDate > now }
+            .sorted { $0.startDate < $1.startDate }
+    }
 }
