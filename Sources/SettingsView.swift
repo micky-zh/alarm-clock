@@ -265,6 +265,22 @@ struct MainSettingsView: View {
                 }
             }
             
+            VStack(alignment: .leading, spacing: 4) {
+                Toggle(isOn: Binding(
+                    get: { manager.isCalendarSyncEnabled },
+                    set: { val in manager.toggleCalendarSync(enabled: val) }
+                )) {
+                    HStack(spacing: 3) {
+                        Image(systemName: "calendar")
+                            .foregroundColor(.blue)
+                        Text("同步系统日历日程提醒")
+                            .font(.system(size: 10, weight: .semibold))
+                    }
+                }
+                .toggleStyle(.checkbox)
+            }
+            .padding(.top, 2)
+            
             Divider()
             
             // 3. Footer / Settings

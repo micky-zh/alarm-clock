@@ -49,6 +49,10 @@ cat <<EOF > "${CONTENTS_DIR}/Info.plist"
     <true/>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
+    <key>NSCalendarsUsageDescription</key>
+    <string>飞机闹钟需要访问您的日历以获取日程并为您提供定时飞出提醒。</string>
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>飞机闹钟需要访问您的完整日历以读取日程事件并为您提供定时飞出提醒。</string>
 </dict>
 </plist>
 EOF

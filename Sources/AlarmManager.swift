@@ -27,6 +27,7 @@ class AlarmManager: ObservableObject {
     @Published var selectedStyle: Int = 0
     @Published var alarmMode: Int = 0 // 0 = fly through, 1 = hover, 2 = loop
     @Published var isAlarmFiring: Bool = false
+    @Published var isCalendarSyncEnabled: Bool = false
     
     private var timer: AnyCancellable?
     private var lastTriggeredTime: Date?
@@ -162,11 +163,30 @@ class AlarmManager: ObservableObject {
     private let launchKey = "com.airplane.launchAtLogin"
     private let styleKey = "com.airplane.selectedStyle"
     private let modeKey = "com.airplane.alarmMode"
+    private let calendarSyncKey = "com.airplane.calendarSyncEnabled"
     
     func toggleLaunchAtLogin() {
         launchAtLogin.toggle()
         saveSettings()
         updateLaunchAgent()
+    }
+    
+    func toggleCalendarSync(enabled: Bool) {
+        if enabled {
+            CalendarManager.shared.requestAccess { [weak self] granted, error in
+                DispatchQueue.main.async {
+                    if granted {
+                        self?.isCalendarSyncEnabled = true
+                    } else {
+                        self?.isCalendarSyncEnabled = false
+                    }
+                    self?.saveSettings()
+                }
+            }
+        } else {
+            self.isCalendarSyncEnabled = false
+            saveSettings()
+        }
     }
     
     func saveSettings() {
@@ -176,6 +196,7 @@ class AlarmManager: ObservableObject {
         UserDefaults.standard.set(launchAtLogin, forKey: launchKey)
         UserDefaults.standard.set(selectedStyle, forKey: styleKey)
         UserDefaults.standard.set(alarmMode, forKey: modeKey)
+        UserDefaults.standard.set(isCalendarSyncEnabled, forKey: calendarSyncKey)
     }
     
     private func loadSettings() {
@@ -187,6 +208,7 @@ class AlarmManager: ObservableObject {
         self.selectedStyle = 0
         let loadedMode = UserDefaults.standard.integer(forKey: modeKey)
         self.alarmMode = (loadedMode == 0 || loadedMode == 1) ? loadedMode : 0
+        self.isCalendarSyncEnabled = UserDefaults.standard.bool(forKey: calendarSyncKey)
     }
     
     private var launchAgentPlistPath: URL {
